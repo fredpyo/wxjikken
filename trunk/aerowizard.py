@@ -18,6 +18,7 @@ class AeroWizard(wx.Frame):
         self.data = data
         self.pages = []
         self.current_page = None
+        self.route = 'default'
         
         self.DoLayout()
         self.Bind(EVT_PAGE_CHANGE, self.OnPageChange)
@@ -141,14 +142,14 @@ class AeroWizard(wx.Frame):
         wx.PostEvent(self, PageChangeEvent(page=self.current_page.next))
 
 class AeroPage(wx.Panel):
-    def __init__(self, parent, title, data = None):
+    def __init__(self, parent, title):
         wx.Panel.__init__(self, parent, -1, (-1, -1))
+        self.wizard = parent
         self.title = title
         self.is_end = False
         self.items = []
-        self.data = data
-        self.next = None
-        self.prev = None
+        self.next = {}
+        self.prev = {}
         self.SetBackgroundColour("#ffffff")
         self._aero_layout()
         self.Show(False)
@@ -182,19 +183,54 @@ class AeroPage(wx.Panel):
         self.items.append((item, proportion, flag, border))
     
     def GetNext(self):
-        return self.next
+        return self._GetNextOrDefault()
     
     def GetPrev(self):
-        return self.prev
+        return self._GetPrevOrDefault()
+    
+    def _GetNextOrDefault(self):
+        try:
+            return self.next[self.wizard.route]
+        except:
+            try:
+                return self.next['default']
+            except:
+                return None
+
+    def _GetPrevOrDefault(self):
+        try:
+            return self.prev[self.wizard.route]
+        except:
+            try:
+                return self.prev['default']
+            except:
+                return None
 
     def GoToNext(self):
         if self.next:
-            wx.PostEvent(self.Parent, PageChangeEvent(page=self.next))
+            wx.PostEvent(self.Parent, PageChangeEvent(page=self._GetNextOrDefault()))
     
     def GoToPrev(self):
         if self.prev:
-            wx.PostEvent(self.Parent, PageChangeEvent(page=self.prev))
-
+            wx.PostEvent(self.Parent, PageChangeEvent(page=self._GetPrevOrDefault()))
+            
+    def Chain(self, target):
+        '''
+        Set the pages that will be chained with this one.
+        Target can either be a AeroPage instance or a dictionary with the following format:
+        {"route_name" : <instance of AeroPage>, "route2_name" : <instance of AeroPage>, ... }
+        '''
+        # if is dict, iterate over dict
+        if isinstance(target, dict):
+            for path_label, page in target.iteritems():
+                self.next[path_label] = page # set forward route
+                page.prev[path_label] = self # set backwards route
+        # if is single page instance, set default route
+        elif isinstance(target, AeroPage):
+            self.next['default'] = page # forward
+            page.prev['default'] = self # backwards
+        else:
+            raise TypeError("'target' argument should be of type 'dict' or type 'AeroPage'")
 
 def AeroWizard_Chain(a, b):
     '''
