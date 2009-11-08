@@ -3,6 +3,8 @@
 Created on 05/10/2009
 
 @author: Federico Cáceres <fede.caceres@gmail.com>
+
+Implements a wizard style similar to Microsoft Aero Wizard specification.
 '''
 
 import wx
@@ -11,37 +13,59 @@ from time import sleep
 
 (PageChangeEvent, EVT_PAGE_CHANGE) = wx.lib.newevent.NewEvent()
 
+BUTTON_LABELS = {
+    'next' : u'Siguiente',
+    'prev' : u'Anterior',
+    'cancel' : u'Cancelar',
+    'end' : u'Finalizar',
+}
+
+EXIT_DIALOG = {
+    'title' : u'Confirmación de salida',
+    'body' : u'Esto anulará los cambios sobre su archivo de datos.\n¿Está seguro de que desea salir?'
+}
+
 class AeroWizard(wx.Frame):
+    '''
+    AeroWizard class
+    Description? Nah...
+    '''
     def __init__(self, title, data = None):
         wx.Frame.__init__(self, None, -1, title, style= wx.DEFAULT_FRAME_STYLE ^ (wx.RESIZE_BORDER | wx.MINIMIZE_BOX | wx.MAXIMIZE_BOX))
-        #wx.Frame.__init__(self, None, -1, title)
         self.data = data
         self.pages = []
+        self.start_page = None
         self.current_page = None
         self.route = 'default'
+        self.on_exit_confirm = True
         
         self.DoLayout()
         self.Bind(EVT_PAGE_CHANGE, self.OnPageChange)
     
     def DoLayout(self):
+        '''
+        Set the basic layout consisting of a white frame, a root vertical BoxSizer,
+        which in turn contains another vertical box sizer where wizard pages are appended
+        and a button bar on the bottom
+        '''
         self.SetBackgroundColour("#ffffff")
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(sizer)
-        # crear panel contender de los contenidos (valga la redundancia)
+        # create content panel for wizard pages
         self.content = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.content, 1, wx.EXPAND)
-
-        # crear la botonera
+        # buttons!
         buttons = self.CreateButtons()
         sizer.Add(buttons, 0, wx.EXPAND)
 
     def CreateButtons(self):
+        '''Create the lower buttons and bind their events'''
         panel = wx.Panel(self)
         panel.SetBackgroundColour("#f0f0f0")
         
-        self.button_prev = wx.Button(panel, wx.ID_PREVIEW_PREVIOUS, "Anterior")
-        self.button_next = wx.Button(panel, wx.ID_PREVIEW_NEXT, "Siguiente")
-        self.button_end = wx.Button(panel, wx.ID_CLOSE, "Cancelar")
+        self.button_prev = wx.Button(panel, wx.ID_PREVIEW_PREVIOUS, BUTTON_LABELS['prev'])
+        self.button_next = wx.Button(panel, wx.ID_PREVIEW_NEXT, BUTTON_LABELS['next'])
+        self.button_end = wx.Button(panel, wx.ID_CLOSE, BUTTON_LABELS['cancel'])
         
         self.Bind(wx.EVT_BUTTON, self.OnButtonPrev, self.button_prev)
         self.Bind(wx.EVT_BUTTON, self.OnButtonNext, self.button_next)
@@ -58,38 +82,45 @@ class AeroWizard(wx.Frame):
         return panel
     
     def UpdateButtons(self):
+        '''
+        Refresh buttons to change their enabled/disabled states of the next and prev buttons
+        and the text for the cancel/finish button
+        '''
+        # enable next/prev if GetNext/GetPrev return something!
         self.button_next.Enable(True if self.current_page.GetNext() else False)
         self.button_prev.Enable(True if self.current_page.GetPrev() else False)
+        # if this page is the end, present the end button, if not, there are more to come just present the cancel label
         if self.current_page.is_end:
-            self.button_end.SetLabel("Finalizar")
+            self.button_end.SetLabel(BUTTON_LABELS['end'])
+            self.on_exit_confirm = False
         else:
-            self.button_end.SetLabel("Cancelar")
+            self.button_end.SetLabel(BUTTON_LABELS['cancel'])
+            self.on_exit_confirm = True
         self.Refresh()
         
     def RunWizzard(self, app = None):
         app = wx.GetApp()
         app.TopWindow = self
         app.TopWindow.Show()
-        wx.PostEvent(self, PageChangeEvent(page=self.pages[0]))
+        wx.PostEvent(self, PageChangeEvent(page=self.start_page))
         app.MainLoop()
     
     def OnPageChange(self, event):
         #page = event.page(self, self.data)
         page = event.page
 
-        #print "BEFORE", self.GetSizer().GetMinSize(), self.GetVirtualSize()
-
         if page == None:
             return
+        # hide and detach current page from wizard
         if self.current_page:
             self.current_page.Show(False)
             self.content.Detach(self.current_page)
+        # set new page, attach it to the wizard and show it
         self.current_page = page
+        self.content.Add(self.current_page)
         self.current_page.Show(True)
-        
-        self.UpdateButtons()
-        self.content.Add(page)
-        
+        # update buttons
+        self.UpdateButtons()        
         #print "AFTER 1", self.GetSizer().GetMinSize(), self.GetVirtualSize()
 
         """  
@@ -109,19 +140,11 @@ class AeroWizard(wx.Frame):
             sleep(1)
         """
         
-        self.content.Layout() # distribuir el nuevo contenido en la ventana
-        self.Fit() # reajustar el tamaño de la ventana del wizard
-        self.Center() # centrar
+        # autoadjust to content and center
+        self.content.Layout() # distribute the window's new content
+        self.Fit() # fit the size of the wizard window
+        self.Center() # center :P
         
-        
-        
-        #print "AFTER 2", self.GetSizer().GetMinSize(), self.GetVirtualSize()
-        
-        """
-        page.Layout()
-        page.Fit()
-        page.Refresh()
-        """
         
         """
         dialog = wx.MessageDialog(None, "!!!", "!!!", wx.OK)
@@ -129,19 +152,29 @@ class AeroWizard(wx.Frame):
         dialog.Destroy()
         """
         
+    def SetStartPage(self, page):
+        '''Set the start page'''
+        self.start_page = page
+
     def AddPage(self, page):
         self.pages.append(page)
         
     def OnButtonEnd(self, event):
-        self.Close()
+        if self.on_exit_confirm:
+            dialog = wx.MessageDialog(self, EXIT_DIALOG['body'], EXIT_DIALOG['title'], wx.YES_NO | wx.ICON_QUESTION)
+            if dialog.ShowModal() == wx.ID_YES:
+                self.Close()
+        else:
+            self.Close()
 
     def OnButtonPrev(self, event):
-        wx.PostEvent(self, PageChangeEvent(page=self.current_page.prev))
+        wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetPrevOrDefault()))
         
     def OnButtonNext(self, event):
-        wx.PostEvent(self, PageChangeEvent(page=self.current_page.next))
+        wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetNextOrDefault()))
 
 class AeroPage(wx.Panel):
+    '''AeroWizard Page'''
     def __init__(self, parent, title):
         wx.Panel.__init__(self, parent, -1, (-1, -1))
         self.wizard = parent
@@ -159,10 +192,6 @@ class AeroPage(wx.Panel):
         self.SetSizer(margin)
         margin.AddSpacer(38)
         self.content = self.makePageTitle(self.title)
-        """
-        self.content = wx.Panel(self)
-        self.content.SetBackgroundColour("black")
-        """
         margin.Add(self.content, 1, wx.EXPAND)
         margin.AddSpacer(38)
         for i in self.items:
@@ -180,12 +209,15 @@ class AeroPage(wx.Panel):
         return sizer
     
     def Add(self, item, proportion, flag, border):
+        '''Add widgets to page'''
         self.items.append((item, proportion, flag, border))
     
     def GetNext(self):
+        '''Override this method if you please'''
         return self._GetNextOrDefault()
     
     def GetPrev(self):
+        '''Override this method if you please'''
         return self._GetPrevOrDefault()
     
     def _GetNextOrDefault(self):
@@ -227,14 +259,13 @@ class AeroPage(wx.Panel):
                 page.prev[path_label] = self # set backwards route
         # if is single page instance, set default route
         elif isinstance(target, AeroPage):
-            self.next['default'] = page # forward
-            page.prev['default'] = self # backwards
+            self.next['default'] = target # forward
+            target.prev['default'] = self # backwards
         else:
             raise TypeError("'target' argument should be of type 'dict' or type 'AeroPage'")
 
-def AeroWizard_Chain(a, b):
-    '''
-    Encadenar las páginas
-    '''
-    a.next = b
-    b.prev = a
+class AeroStaticText(wx.StaticText):
+    '''StaticText with custom font for AeroWizard'''
+    def __init__(self, parent, id, text):
+        wx.StaticText.__init__(self, parent, id, text)
+        self.SetFont(wx.Font(10, wx.SWISS, wx.NORMAL, wx.NORMAL, False, "Segoe UI"))
