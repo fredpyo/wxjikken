@@ -168,10 +168,12 @@ class AeroWizard(wx.Frame):
             self.Close()
 
     def OnButtonPrev(self, event):
-        wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetPrevOrDefault()))
+        if self.current_page.OnPrev():
+            wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetPrevOrDefault()))
         
     def OnButtonNext(self, event):
-        wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetNextOrDefault()))
+        if self.current_page.OnNext():
+            wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetNextOrDefault()))
 
 class AeroPage(wx.Panel):
     '''AeroWizard Page'''
@@ -186,6 +188,8 @@ class AeroPage(wx.Panel):
         self.SetBackgroundColour("#ffffff")
         self._aero_layout()
         self.Show(False)
+        # default behaviour
+        self.Bind(wx.EVT_SHOW, self.OnShow)
         
     def _aero_layout(self):
         margin = wx.BoxSizer(wx.HORIZONTAL)
@@ -208,19 +212,46 @@ class AeroPage(wx.Panel):
         sizer.Add(title, 0, wx.ALIGN_LEFT | wx.TOP | wx.BOTTOM, 19)
         return sizer
     
+    def OnShow(self, event):
+        '''Called when the page is shown'''
+        # override this
+        pass
+    
     def Add(self, item, proportion, flag, border):
         '''Add widgets to page'''
         self.items.append((item, proportion, flag, border))
     
+    def OnNext(self):
+        '''
+        Called when the "Next" button is pressed
+        Return True to allow the transition to the next page
+        Return False to cancel the transition to the next page
+        '''
+        # override
+        return True
+    
+    def OnPrev(self):
+        '''
+        Called when the "Previous" button is pressed
+        Return True to allow the transition to the previous page
+        Return False to cancel the transition to the previous page
+        '''
+        # override
+        return True
+    
     def GetNext(self):
-        '''Override this method if you please'''
+        '''Get the page next to this one, return False to disable the Next button'''
         return self._GetNextOrDefault()
     
     def GetPrev(self):
-        '''Override this method if you please'''
+        '''Get the page previous to this one, return False to disable the Previous button'''
         return self._GetPrevOrDefault()
     
     def _GetNextOrDefault(self):
+        '''
+        Get the page next to this one according to the current route,
+        or alternatively the default one
+        '''
         try:
             return self.next[self.wizard.route]
         except:
@@ -230,6 +261,10 @@ class AeroPage(wx.Panel):
                 return None
 
     def _GetPrevOrDefault(self):
+        '''
+        Get the page previous to this one according to the current route,
+        or alternatively the default one
+        '''
         try:
             return self.prev[self.wizard.route]
         except:
@@ -239,10 +274,18 @@ class AeroPage(wx.Panel):
                 return None
 
     def GoToNext(self):
+        '''
+        Go to next page, simulates clicking on the Next button.
+        Note: This DOES NOT call the OnNext method.
+        '''
         if self.next:
             wx.PostEvent(self.Parent, PageChangeEvent(page=self._GetNextOrDefault()))
     
     def GoToPrev(self):
+        '''
+        Go to Previous page, simulates clicking on the Previous button.
+        Note: This DOES NOT call the OnPrev method.
+        '''
         if self.prev:
             wx.PostEvent(self.Parent, PageChangeEvent(page=self._GetPrevOrDefault()))
             
