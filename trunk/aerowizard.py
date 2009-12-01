@@ -31,7 +31,7 @@ class AeroWizard(wx.Frame):
     Description? Nah...
     '''
     def __init__(self, title, data = None):
-        wx.Frame.__init__(self, None, -1, title, style= wx.DEFAULT_FRAME_STYLE ^ (wx.RESIZE_BORDER | wx.MINIMIZE_BOX | wx.MAXIMIZE_BOX))
+        wx.Frame.__init__(self, None, -1, title, style= wx.DEFAULT_FRAME_STYLE ^ (wx.RESIZE_BORDER | wx.MINIMIZE_BOX | wx.MAXIMIZE_BOX) | wx.WANTS_CHARS | wx.TAB_TRAVERSAL)
         self.data = data
         self.pages = []
         self.start_page = None
@@ -41,6 +41,8 @@ class AeroWizard(wx.Frame):
         
         self.DoLayout()
         self.Bind(EVT_PAGE_CHANGE, self.OnPageChange)
+        
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
     
     def DoLayout(self):
         '''
@@ -141,9 +143,7 @@ class AeroWizard(wx.Frame):
         """
         
         # autoadjust to content and center
-        self.content.Layout() # distribute the window's new content
-        self.Fit() # fit the size of the wizard window
-        self.Center() # center :P
+        self.LayoutFitCenter()
         
         
         """
@@ -152,13 +152,27 @@ class AeroWizard(wx.Frame):
         dialog.Destroy()
         """
         
+    def LayoutFitCenter(self):
+        '''autoadjust to content and center'''
+        self.content.Layout() # distribute the window's new content
+        self.Fit() # fit the size of the wizard window
+        self.Center() # center :P
+
     def SetStartPage(self, page):
         '''Set the start page'''
         self.start_page = page
 
     def AddPage(self, page):
         self.pages.append(page)
-        
+    
+    def OnKeyDown(self, event):
+        print event.GetKeyCode()
+        if event.GetKeyCode() == 13:
+            if self.current_page.OnNext():
+                wx.PostEvent(self, PageChangeEvent(page=self.current_page._GetNextOrDefault()))
+        else:
+            event.Skip()                        
+    
     def OnButtonEnd(self, event):
         if self.on_exit_confirm:
             dialog = wx.MessageDialog(self, EXIT_DIALOG['body'], EXIT_DIALOG['title'], wx.YES_NO | wx.ICON_QUESTION)
