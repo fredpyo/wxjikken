@@ -203,7 +203,7 @@ class AeroPage(wx.Panel):
         self._aero_layout()
         self.Show(False)
         # default behaviour
-        self.Bind(wx.EVT_SHOW, self.OnShow)
+        self.Bind(wx.EVT_SHOW, self._OnShow)
         
     def _aero_layout(self):
         margin = wx.BoxSizer(wx.HORIZONTAL)
@@ -225,10 +225,23 @@ class AeroPage(wx.Panel):
         
         sizer.Add(title, 0, wx.ALIGN_LEFT | wx.TOP | wx.BOTTOM, 19)
         return sizer
-    
+
     def OnShow(self, event):
         '''Called when the page is shown'''
         # override this
+        pass
+    
+    def OnHide(self, event):
+        '''Called when the page is hidden'''
+        # override this
+        pass
+    
+    def _OnShow(self, event):
+        '''Called when the page is shown or hidden, forwards the event to the corresponding method'''
+        if event.GetShow():
+            self.OnShow(event)
+        else:
+            self.OnHide(event)
         pass
     
     def Add(self, item, proportion, flag, border):
