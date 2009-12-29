@@ -56,6 +56,10 @@ class AeroWizard(wx.Frame):
         # create content panel for wizard pages
         self.content = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.content, 1, wx.EXPAND)
+        # 1px dark linespacer between contents and buttons 
+        line = wx.Panel(self, size=(-1,1))
+        line.SetBackgroundColour("#d0d0d0")
+        sizer.Add(line, 0, wx.EXPAND)
         # buttons!
         buttons = self.CreateButtons()
         sizer.Add(buttons, 0, wx.EXPAND)
